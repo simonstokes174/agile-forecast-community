@@ -1,0 +1,107 @@
+# Home Assistant package: replace C in BOTH URLs with your region.
+# Raw data sensors hold attributes; template sensors re-evaluate each minute.
+rest:
+  - resource: "https://agileforecast.co.uk/api/C/?hours=24"
+    scan_interval: 1800
+    timeout: 30
+    sensor:
+      - name: "Agile Forecast API Data"
+        unique_id: agile_forecast_api_data
+        value_template: "{{ utcnow().isoformat() }}"
+        json_attributes_path: "$[0]"
+        json_attributes:
+          - prices
+          - created_at
+  - resource: "https://agileforecast.co.uk/api/C/confirmed"
+    scan_interval: 600
+    timeout: 30
+    sensor:
+      - name: "Agile Confirmed API Data"
+        unique_id: agile_confirmed_api_data
+        value_template: "{{ utcnow().isoformat() }}"
+        json_attributes:
+          - confirmed_rates
+          - fetched_at
+
+template:
+  - sensor:
+      - name: "Agile Forecast Current Price"
+        unique_id: agile_forecast_current_price
+        unit_of_measurement: "p/kWh"
+        state_class: measurement
+        availability: >-
+          {{ has_value('sensor.agile_forecast_api_data') and
+             0 <= as_timestamp(now()) - as_timestamp(states('sensor.agile_forecast_api_data'), 0) < 7200 }}
+        state: >-
+          {% set now_ts = as_timestamp(now()) %}
+          {% set slot_ts = (now_ts | int // 1800) * 1800 %}
+          {% set ns = namespace(value=none) %}
+          {% for p in state_attr('sensor.agile_forecast_api_data', 'prices') or [] %}
+            {% set pt = as_timestamp(p.date_time, 0) %}
+            {% if pt == slot_ts and p.agile_pred is number %}
+              {% if true %}
+                {% set ns.value = p.agile_pred %}
+              {% endif %}
+            {% endif %}
+          {% endfor %}
+          {{ ns.value | round(2) if ns.value is not none else none }}
+      - name: "Agile Forecast Current High"
+        unique_id: agile_forecast_current_high
+        unit_of_measurement: "p/kWh"
+        state_class: measurement
+        availability: >-
+          {{ has_value('sensor.agile_forecast_api_data') and
+             0 <= as_timestamp(now()) - as_timestamp(states('sensor.agile_forecast_api_data'), 0) < 7200 }}
+        state: >-
+          {% set now_ts = as_timestamp(now()) %}
+          {% set slot_ts = (now_ts | int // 1800) * 1800 %}
+          {% set ns = namespace(value=none) %}
+          {% for p in state_attr('sensor.agile_forecast_api_data', 'prices') or [] %}
+            {% set pt = as_timestamp(p.date_time, 0) %}
+            {% if pt == slot_ts and p.agile_high is number %}
+              {% if true %}
+                {% set ns.value = p.agile_high %}
+              {% endif %}
+            {% endif %}
+          {% endfor %}
+          {{ ns.value | round(2) if ns.value is not none else none }}
+      - name: "Agile Forecast Cheapest Next 6h"
+        unique_id: agile_forecast_cheapest_6h
+        unit_of_measurement: "p/kWh"
+        state_class: measurement
+        availability: >-
+          {{ has_value('sensor.agile_forecast_api_data') and
+             0 <= as_timestamp(now()) - as_timestamp(states('sensor.agile_forecast_api_data'), 0) < 7200 }}
+        state: >-
+          {% set now_ts = as_timestamp(now()) %}
+          {% set slot_ts = (now_ts | int // 1800) * 1800 %}
+          {% set ns = namespace(value=none) %}
+          {% for p in state_attr('sensor.agile_forecast_api_data', 'prices') or [] %}
+            {% set pt = as_timestamp(p.date_time, 0) %}
+            {% if pt >= now_ts and pt < now_ts + 21600 and p.agile_pred is number %}
+              {% if ns.value is none or p.agile_pred < ns.value %}
+                {% set ns.value = p.agile_pred %}
+              {% endif %}
+            {% endif %}
+          {% endfor %}
+          {{ ns.value | round(2) if ns.value is not none else none }}
+      - name: "Agile Confirmed Current Price"
+        unique_id: agile_confirmed_current_price
+        unit_of_measurement: "p/kWh"
+        state_class: measurement
+        availability: >-
+          {{ has_value('sensor.agile_confirmed_api_data') and
+             0 <= as_timestamp(now()) - as_timestamp(states('sensor.agile_confirmed_api_data'), 0) < 7200 }}
+        state: >-
+          {% set now_ts = as_timestamp(now()) %}
+          {% set slot_ts = (now_ts | int // 1800) * 1800 %}
+          {% set ns = namespace(value=none) %}
+          {% for p in state_attr('sensor.agile_confirmed_api_data', 'confirmed_rates') or [] %}
+            {% set pt = as_timestamp(p.date_time, 0) %}
+            {% if pt == slot_ts and p.price is number %}
+              {% if true %}
+                {% set ns.value = p.price %}
+              {% endif %}
+            {% endif %}
+          {% endfor %}
+          {{ ns.value | round(2) if ns.value is not none else none }}

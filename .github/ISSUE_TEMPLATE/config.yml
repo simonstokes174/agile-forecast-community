@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Questions and helpful hints
+    url: https://github.com/simonstokes174/agile-forecast-community/discussions
+    about: Share setups, ask questions, and discuss integration ideas.
